@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Datasets are licensed: never commit them
+data/raw/
+data/manifests/
+data/landmarks/
+
+# MediaPipe model and experiment outputs
+models/
+results/
+
+# OS / editors
+.DS_Store
+._*
+desktop.ini
+Thumbs.db
+.vscode/
+.idea/

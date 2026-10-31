@@ -1,0 +1,32 @@
+# End-to-end check on synthetic data (runs in a minute or two, CPU or GPU).
+# Create the data first:
+#   fgl synth --out data/landmarks/synthetic.npz --subjects 30 --identity-seed 0 --prefix S
+#   fgl synth --out data/landmarks/synthetic_public.npz --subjects 60 --identity-seed 1 --prefix P
+name: smoke
+results_dir: results
+device: auto
+seeds: [0]
+
+datasets:
+  target: {path: data/landmarks/synthetic.npz}
+  public: {path: data/landmarks/synthetic_public.npz}
+
+representations: [legacy_angles, angles2d, angles3d, delaunay_angles2d, distances2d,
+                  coords2d, coords3d, blendshapes]
+
+models:
+  mlp: {epochs: 20}
+  cosface: {epochs: 10}
+  adversarial: {epochs: 20}
+
+experiments:
+  - {type: identify_match, tag: cross_session, dataset: target,
+     gallery: {session: [A]}, probe: {session: [B]}, stochastic: false}
+  - {type: identify_loeo, tag: loeo, dataset: target, models: [logreg, lda, mlp]}
+  - {type: verify_open_set, tag: open_set, attacker_dataset: public, target: target,
+     attackers: [cosine, lda, cosface]}
+  - {type: utility, tag: utility, dataset: target, models: [logreg]}
+  - {type: defense, tag: defense, dataset: target, representations: [angles2d],
+     defenses: [none, delta_neutral, {name: noise, sigma: [0.5, 1.0]},
+                {name: quantize, step: [0.5]}, {name: select, drop_fraction: [0.5]},
+                {name: adversarial, lam: [1.0]}]}

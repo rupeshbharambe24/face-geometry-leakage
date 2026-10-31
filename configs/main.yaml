@@ -1,0 +1,74 @@
+# Main study. Datasets are loaded lazily: run subsets with --only <tag ...> if you
+# have not extracted every dataset yet (e.g. start with the kdef_* tags).
+name: main
+results_dir: results
+device: auto        # cuda on the RTX 3050 Ti, falls back to cpu
+seeds: [0, 1, 2]
+
+datasets:
+  kdef:        {path: data/landmarks/kdef.npz, filters: {pose: [S]}}   # frontal only
+  kdef_pose:   {path: data/landmarks/kdef.npz, filters: {pose: [S, HL, HR]}}
+  jaffe:       {path: data/landmarks/jaffe.npz}
+  ckplus:      {path: data/landmarks/ckplus.npz}
+  celeba:      {path: data/landmarks/celeba.npz}                       # attacker's public data
+
+representations: [legacy_angles, angles2d, angles3d, delaunay_angles2d, distances2d,
+                  coords2d, coords3d, blendshapes]
+
+models:
+  logreg_C: 1.0
+  mlp: {hidden: [256, 128], dropout: 0.3, epochs: 200, lr: 0.001, batch_size: 256}
+  cosface: {dim: 128, hidden: [512, 256], epochs: 60, batch_size: 512, margin: 0.25}
+  adversarial: {dim: 64, epochs: 200}
+
+experiments:
+  # RQ1  closed-set identification: does geometry re-identify enrolled people?
+  - {type: identify_match, tag: kdef_cross_session, dataset: kdef,
+     gallery: {session: [A]}, probe: {session: [B]}, stochastic: false}
+  - {type: identify_match, tag: kdef_neutral_gallery, dataset: kdef,
+     gallery: {expression: [neutral]}, stochastic: false}
+  - {type: identify_match, tag: ckplus_neutral_gallery, dataset: ckplus,
+     gallery: {expression: [neutral]}, stochastic: false}
+  - {type: identify_loeo, tag: kdef_loeo, dataset: kdef, models: [logreg, lda, mlp]}
+  - {type: identify_loeo, tag: jaffe_loeo, dataset: jaffe, models: [logreg, lda, mlp]}
+  - {type: identify_loeo, tag: ckplus_loeo, dataset: ckplus, models: [logreg, lda, mlp]}
+
+  # RQ2  open-set linkage: attacker trains only on public CelebA, links unseen people
+  - {type: verify_open_set, tag: celeba_to_kdef, attacker_dataset: celeba, target: kdef,
+     attackers: [cosine, lda, cosface]}
+  - {type: verify_open_set, tag: celeba_to_ckplus, attacker_dataset: celeba, target: ckplus,
+     attackers: [cosine, lda, cosface]}
+  - {type: verify_open_set, tag: celeba_to_jaffe, attacker_dataset: celeba, target: jaffe,
+     attackers: [cosine, lda, cosface]}
+
+  # RQ3  head pose: frontal gallery vs half-profile probes
+  - {type: identify_match, tag: kdef_pose_shift, dataset: kdef_pose,
+     gallery: {pose: [S]}, probe: {pose: [HL, HR]}, stochastic: false}
+
+  # RQ4  utility: expression recognition on unseen people
+  - {type: utility, tag: kdef_utility, dataset: kdef, models: [logreg, mlp]}
+  - {type: utility, tag: ckplus_utility, dataset: ckplus, models: [logreg, mlp]}
+  - {type: utility, tag: jaffe_utility, dataset: jaffe, models: [logreg, mlp]}
+
+  # RQ5  defences: privacy/utility trade-off on held-out people
+  - type: defense
+    tag: kdef_defense
+    dataset: kdef
+    representations: [legacy_angles, angles2d, angles3d, blendshapes]
+    defenses:
+      - none
+      - delta_neutral
+      - {name: noise, sigma: [0.25, 0.5, 1.0, 2.0]}
+      - {name: quantize, step: [0.25, 0.5, 1.0]}
+      - {name: select, drop_fraction: [0.25, 0.5, 0.75]}
+      - {name: adversarial, lam: [0.3, 1.0, 3.0]}
+  - type: defense
+    tag: ckplus_defense
+    dataset: ckplus
+    representations: [legacy_angles, angles2d, angles3d, blendshapes]
+    defenses:
+      - none
+      - delta_neutral
+      - {name: noise, sigma: [0.25, 0.5, 1.0, 2.0]}
+      - {name: select, drop_fraction: [0.25, 0.5, 0.75]}
+      - {name: adversarial, lam: [0.3, 1.0, 3.0]}
