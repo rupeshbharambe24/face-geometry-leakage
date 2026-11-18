@@ -10,6 +10,7 @@ __pycache__/
 data/raw/
 data/manifests/
 data/landmarks/
+data/downloads/
 
 # MediaPipe model and experiment outputs
 models/
